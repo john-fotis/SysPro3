@@ -30,3 +30,7 @@
 *.exe
 *.out
 *.app
+
+input_dir
+travelMonitorClient
+monitorServer
