@@ -31,9 +31,9 @@ class List {
 
    public:
     List() : size(0), head(NULL), tail(NULL) {}
-    List(const List &l) : size(0), head(NULL), tail(NULL) { recCopy(l.head); }
+    List(const List &l);
     ~List() { flush(); }
-
+    List &operator=(const List &l);
     unsigned int getSize() const { return size; }
     T &getFirst() { return head->data; }
     T &getLast() { return tail->data; }
@@ -60,6 +60,21 @@ class List {
     T *search(const T data) const;
     bool contains(const T &data) const;
 };
+
+template <typename T>
+List<T>::List(const List<T> &l) : size(0), head(NULL), tail(NULL) {
+    if (this==&l) return;
+    flush();
+    recCopy(l.head);
+}
+
+template <typename T>
+List<T> &List<T>::operator=(const List<T> &l) {
+    if (this == &l) return *this;
+    flush();
+    recCopy(l.head);
+    return *this;
+}
 
 template <typename T>
 void List<T>::insertFirst(T data) {
