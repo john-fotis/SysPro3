@@ -16,9 +16,9 @@ bool checkTravelArgs(List<std::string> &args) {
         if (args.getNode(3)->compare("-b")) errorNumber = bufferIdentifier;
         if (isInt(*args.getNode(4)))
             if (myStoi(*args.getNode(4)) < 1) errorNumber = bufferSize;
-        if (args.getNode(5)->compare("-c")) errorNumber = cBufferIdentifier;
+        if (args.getNode(5)->compare("-c")) errorNumber = cBuffIdentifier;
         if (isInt(*args.getNode(6)))
-            if (myStoi(*args.getNode(6)) < 1) errorNumber = cBufferSize;
+            if (myStoi(*args.getNode(6)) < 1) errorNumber = cBuffSize;
         if (args.getNode(7)->compare("-s")) errorNumber = bloomIdentifier;
         if (isInt(*args.getNode(8)))
             if (myStoi(*args.getNode(8)) < 1) errorNumber = bloomSize;
@@ -35,8 +35,8 @@ bool checkTravelArgs(List<std::string> &args) {
         else if (errorNumber == monitorNumber) std::cerr << "Invalid number of Monitors.\n";
         else if (errorNumber == bufferIdentifier) std::cerr << "Invalid socket-buffer size identifier.\n";
         else if (errorNumber == bufferSize) std::cerr << "Invalid socket-buffer size.\n";
-        else if (errorNumber == cBufferIdentifier) std::cerr << "Invalid cyclic-buffer size identifier.\n";
-        else if (errorNumber == cBufferSize) std::cerr << "Invalid cyclic-buffer size.\n";
+        else if (errorNumber == cBuffIdentifier) std::cerr << "Invalid cyclic-buffer size identifier.\n";
+        else if (errorNumber == cBuffSize) std::cerr << "Invalid cyclic-buffer size.\n";
         else if (errorNumber == bloomIdentifier) std::cerr << "Invalid bloom filter identifier.\n";
         else if (errorNumber == bloomSize) std::cerr << "Invalid bloom filter size.\n";
         else if (errorNumber == directoryIdentifier) std::cerr << "Invalid input directory identifier.\n";
