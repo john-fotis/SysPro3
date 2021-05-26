@@ -13,7 +13,7 @@ SCRIPTS	= create_infiles.sh
 # Run Parameters
 BUFFSZ	= 64
 CBUFFSZ	= 10
-NUMBER	= 9
+NUMBER	= 4
 BLOOMSZ	= 1000
 INDIR	= input_dir/
 THREADS	= 2
@@ -53,7 +53,7 @@ scriptRun:
 	./$(SCRIPTS) $(INFILE) $(INDIR) $(NUMBER)
 
 valgrind:
-	valgrind --leak-check=full --show-leak-kinds=all --show-reachable=yes --trace-children=yes --track-origins=yes ./$(TARGET) -m $(NUMBER) -b $(BUFFSZ) -s $(BLOOMSZ) -i $(INDIR)
+	valgrind -s --leak-check=full --show-leak-kinds=all --show-reachable=yes --trace-children=yes --track-origins=yes ./$(TARGET) -m $(NUMBER) -b $(BUFFSZ) -c $(CBUFFSZ) -s $(BLOOMSZ) -i $(INDIR) -t $(THREADS)
 
 help:
 	@echo Options:
