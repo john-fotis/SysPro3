@@ -227,10 +227,8 @@ void initFileList(List<string> folders, List<string> &fileList) {
 
     // Open every subdirectory
     for (unsigned int i = 0; i < folders.getSize(); i++) {
-        if ((dirPtr = opendir((*folders.getNode(i)).c_str())) == NULL && errno != 0) {
-            perror("client/initFileList");
-            exit(25);
-        }
+        if ((dirPtr = opendir((*folders.getNode(i)).c_str())) == NULL && errno != 0)
+            die("monitor/initFileList", 25);
 
         while ((direntPtr = readdir(dirPtr))) {
             filePath.assign(*folders.getNode(i));
@@ -334,10 +332,9 @@ int main(int argc, char *argv[]) {
     for (int i = 0; i < argc; i++)
         args.insertLast(toString(argv[i]));
     // args: 1) path/to/fifo1 2) path/to/fifo2
-    if (!checkMonitorArgs(args)) {
-        perror("client/input");
-        exit(-1);
-    }
+    if (!checkMonitorArgs(args)) die("monitor/input", -1);
+
+    args.print();
 
     // ========== Variables ==========
 
@@ -364,10 +361,10 @@ int main(int argc, char *argv[]) {
     // sa.sa_handler = &signalHandler;
     // sa.sa_flags = SA_RESTART;
     // sigemptyset(&sa.sa_mask);
-    // if (sigaction(SIGINT, &sa, NULL) < 0) { perror("client/sigaction"); exit(4); }
-    // if (sigaction(SIGQUIT, &sa, NULL) < 0) { perror("client/sigaction"); exit(4); }
-    // if (sigaction(SIGUSR1, &sa, NULL) < 0) { perror("client/sigaction"); exit(4); }
-    // if (sigaction(SIGUSR2, &sa, NULL) < 0) { perror("client/sigaction"); exit(4); }
+    // if (sigaction(SIGINT, &sa, NULL) < 0) die("monitor/sigaction, 4");
+    // if (sigaction(SIGQUIT, &sa, NULL) < 0) die("monitor/sigaction, 4");
+    // if (sigaction(SIGUSR1, &sa, NULL) < 0) die("monitor/sigaction, 4");
+    // if (sigaction(SIGUSR2, &sa, NULL) < 0) die("monitor/sigaction, 4");
 
     // // ========== Communication installation START ==========
 

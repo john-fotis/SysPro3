@@ -88,18 +88,15 @@ void reviveChild(List<MonitorInfo> &monitorList, List<VirusRegistry> &virusList,
     // fifoClose(monitorPtr->fdR());
     // fifoClose(monitorPtr->fdW());
 
-    // if ((pid = fork()) < 0) {
-    //     perror("server/reviveChild/fork");
-    //     exit(1);
-    // } else if (pid == 0) {
+    // if ((pid = fork()) < 0) die("travel/fork", 1);
+    // else if (pid == 0) {
     //     execlp("./Monitor",
     //            "./Monitor",
     //            monitorPtr->cFile().c_str(),
     //            monitorPtr->sFile().c_str(),
     //            NULL);
     //     // If the process continues here, exec has failed
-    //     perror("server/reviveChild/exec");
-    //     exit(2);
+    //     die("travel/exec", 2);
     // } else {
     //     // Just replace the PID with the new one and
     //     // reopen both fifo files. No need to re-create them.
@@ -149,6 +146,7 @@ int main(int argc, char *argv[]) {
     unsigned int bloomSize = myStoi(argv[8]);
     string inputDir(argv[10]);
     if (inputDir.back() != '/') inputDir.append("/");
+    unsigned int numThreads = myStoi(argv[12]);
 
     unsigned int travelLen = 0, monitorLen = 0;
     struct sockaddr_in travelClient, monitorServer;
@@ -159,10 +157,10 @@ int main(int argc, char *argv[]) {
     pid_t pid = 0;
     int status = 0, exitStatus = 0;
     string line, country;
-    bool reqAnswer = false, found = false;
-    char *buffer = NULL;
-    unsigned int acceptedReqs = 0, rejectedReqs = 0;
-    unsigned int localAccRecs = 0, localRejRecs = 0;
+    // bool reqAnswer = false, found = false;
+    // char *buffer = NULL;
+    // unsigned int acceptedReqs = 0, rejectedReqs = 0;
+    // unsigned int localAccRecs = 0, localRejRecs = 0;
 
     /* Main app objects */
     MonitorInfo monitor;
@@ -173,10 +171,10 @@ int main(int argc, char *argv[]) {
 
     /* Pointers */
     MonitorInfo *monitorPtr = NULL;
-    string *monCountryPtr = NULL;
-    VirusRegistry *virusPtr = NULL;
-    Request *reqPtr = NULL;
-    RequestRegistry *registryPtr = NULL;
+    // string *monCountryPtr = NULL;
+    // VirusRegistry *virusPtr = NULL;
+    // Request *reqPtr = NULL;
+    // RequestRegistry *registryPtr = NULL;
 
     /* Structs */
     List<MonitorInfo> monitorList;
@@ -194,10 +192,20 @@ int main(int argc, char *argv[]) {
 
     std::cout << SERVER_STARTING;
 
+    // If the number of country subfolders is less than the number of monitors
+    // reduce the number of monitors to the max number of available subfolders
+    if (countDirElements(inputDir) < numMonitors) {
+        numMonitors = countDirElements(inputDir);
+        std::cerr << REDUCE_MONITORS(numMonitors)
+        << NOT_ENOUGH_RESOURCES(inputDir) << std::endl;
+    }
+
     // Distribute the available countries subfolders to the monitors
     monitorWorkMap = distributeWorkLoad(inputDir, numMonitors);
 
+    // Set up all the monitor info except their PIDs
     for (unsigned int mon = 0; mon < numMonitors; mon++) {
+        // monitor.setPID(mon);
         monitor.setSocket(createSocket());
         // Bind socket to address
         travelClient.sin_family = AF_INET;
@@ -208,43 +216,49 @@ int main(int argc, char *argv[]) {
         if (bind(monitor.getSocket(), travelClientPtr, travelLen) < 0) die("bind", 2);
         // Discover selected port
         if (getsockname(monitor.getSocket(), travelClientPtr, &travelLen) < 0) die("getsockname", 3);
-        std::cout << "Socket " << mon << " port: " << ntohs(travelClient.sin_port) << std::endl;
+        monitor.setPort(ntohs(travelClient.sin_port));
+        // std::cout << "Socket " << mon << " port: " << monitor.getPort() << std::endl;
 
-        // monitor.
+        monitor.setCountries(monitorWorkMap[mon]);
+        monitorList.insertLast(monitor);
     }
 
-    // // If the number of country subfolders is less than the number of monitors
-    // // reduce the number of monitors to the max number of available subfolders
-    // if (countDirElements(inputDir) < numMonitors) {
-    //     numMonitors = countDirElements(inputDir);
-    //     std::cerr << REDUCE_MONITORS(numMonitors)
-    //     << NOT_ENOUGH_RESOURCES(inputDir) << std::endl;
-    // }
-
-    // // Create all the Monitor processes
-    // for (unsigned int mon = 1; mon <= numMonitors; mon++) {
-    //     if ((pid = fork()) < 0) {
-    //         perror("server/fork");
-    //         exit(1);
-    //     } else if (pid == 0) {
-    //         execlp("./Monitor",
-    //                "./Monitor",
-    //                (clientFifo + toString(mon)).c_str(),
-    //                (serverFifo + toString(mon)).c_str(),
-    //                NULL);
-    //         // If the process continues here, exec has failed
-    //         perror("server/exec");
-    //         exit(2);
-    //     } else {
-    //         // Parent stores the monitor info
-    //         monitor.setPID(pid);
-    //         monitor.setCFile((clientFifo + toString(mon)));
-    //         monitor.setSFile((serverFifo + toString(mon)));
-    //         monitor.setRead(fifoOpenRead(monitor.cFile()));
-    //         monitor.setWrite(fifoOpenWrite(monitor.sFile()));
-    //         monitorList.insertAscending(monitor);
-    //     }
-    // }
+    // Create all the Monitor processes
+    for (unsigned int mon = 0; mon < numMonitors; mon++) {
+        if ((pid = fork()) < 0) die("travel/fork", 1);
+        else if (pid == 0) {
+            monitorPtr = monitorList.getNode(mon);
+            unsigned int argc = 11 + monitorPtr->countriesNumber() + 1;
+            char *program = "./monitorServer";
+            char **argv = new char*[argc];
+            argv[0] = "./monitorServer";
+            argv[1] = "-p";
+            argv[2] = strdup(toString(monitorPtr->getPort()).c_str());
+            argv[3] = "-t";
+            argv[4] = strdup(toString(numThreads).c_str());
+            argv[5] = "-b";
+            argv[6] = strdup(toString(bufferSize).c_str());
+            argv[7] = "-c";
+            argv[8] = strdup(toString(cBufferSize).c_str());
+            argv[9] = "-s";
+            argv[10] = strdup(toString(bloomSize).c_str());
+            unsigned int argPos = 11;
+            for (unsigned int path = 0; path < monitorPtr->countriesNumber(); path++) {
+                argv[argPos] = strdup((inputDir + monitorPtr->getNthCountry(path) + "/").c_str());
+                argPos++;
+            }
+            argv[argPos] = NULL;
+            // Free up the memory before calling exec
+            delete[] monitorWorkMap;
+            virus.~VirusRegistry();
+            monitor.~MonitorInfo();
+            args.~List();
+            monitorList.~List();
+            execvp(program, argv);
+            // If the process continues here, exec has failed
+            die("travel/exec", 2);
+        } else monitorList.getNode(mon)->setPID(pid);
+    }
 
     // // ========== Signal Handling ==========
 
@@ -252,9 +266,9 @@ int main(int argc, char *argv[]) {
     // sa.sa_handler = &signalHandler;
     // sa.sa_flags = SA_RESTART;
     // sigemptyset(&sa.sa_mask);
-    // if (sigaction(SIGINT, &sa, NULL) < 0) { perror("server/sigaction"); exit(3); }
-    // if (sigaction(SIGQUIT, &sa, NULL) < 0) { perror("server/sigaction"); exit(3); }
-    // if (sigaction(SIGCHLD, &sa, NULL) < 0) { perror("server/sigaction"); exit(3); }
+    // if (sigaction(SIGINT, &sa, NULL) < 0) die("travel/sigaction", 3);
+    // if (sigaction(SIGQUIT, &sa, NULL) < 0) die("travel/sigaction", 3);
+    // if (sigaction(SIGCHLD, &sa, NULL) < 0) die("travel/sigaction", 3);
 
     // // ========== Communication installation START ==========
     
@@ -536,22 +550,22 @@ int main(int argc, char *argv[]) {
     // for (unsigned int mon = 0; mon < monitorList.getSize(); mon++)
     //     kill(monitorList.getNode(mon)->PID(), SIGKILL);
 
-    // // Wait for all Monitors to finish and deallocate their resources
-    // for (unsigned int mon = 0; mon < monitorList.getSize(); mon++)
-    //     waitpid(monitorList.getNode(mon)->PID(), NULL, 0);
+    // Wait for all Monitors to finish and deallocate their resources
+    for (unsigned int mon = 0; mon < monitorList.getSize(); mon++)
+        waitpid(monitorList.getNode(mon)->PID(), NULL, 0);
 
     // for (unsigned int mon = 0; mon < monitorList.getSize(); mon++) {
     //     fifoClose(monitorList.getNode(mon)->fdR());
     //     fifoClose(monitorList.getNode(mon)->fdW());
     // }
 
-    // std::cout << SERVER_STOPPED;
+    std::cout << SERVER_STOPPED;
     // std::cout << LOG_FILES_SAVED(LOG_FILES);
 
-    // delete[] monitorWorkMap;
+    delete[] monitorWorkMap;
 
-    // if ((exitStatus = WEXITSTATUS(status)))
-    //     std::cout << EXIT_CODE_FROM(getpid(), exitStatus) << std::endl;
+    if ((exitStatus = WEXITSTATUS(status)))
+        std::cout << EXIT_CODE_FROM(getpid(), exitStatus) << std::endl;
         
     return 0;
 
