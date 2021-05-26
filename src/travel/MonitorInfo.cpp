@@ -3,12 +3,16 @@
 MonitorInfo::MonitorInfo(const MonitorInfo &monitor) {
     if (this == &monitor) return;
     pid = monitor.PID();
+    sock = monitor.getSocket();
+    port = monitor.getPort();
     countries = monitor.countries;
 }
 
 MonitorInfo &MonitorInfo::operator=(const MonitorInfo &monitor) {
     if (this == &monitor) return *this;
     pid = monitor.PID();
+    sock = monitor.getSocket();
+    port = monitor.getPort();
     countries = monitor.countries;
     return *this;
 }
@@ -38,7 +42,8 @@ bool operator>=(const MonitorInfo &r1, const MonitorInfo &r2) {
 }
 
 std::ostream &operator<<(std::ostream &os, const MonitorInfo &monitor) {
-    os  << monitor.PID() << std::endl;
+    os  << monitor.PID() << " " << monitor.getSocket()
+        << " " << monitor.getPort() << std::endl;
     monitor.countries.print();
     return os;
 }

@@ -9,7 +9,7 @@ class MonitorInfo {
 private:
     pid_t pid;
     int sock;
-    unsigned long port;
+    uint16_t port;
     List<std::string> countries;
 
 public:
@@ -20,13 +20,18 @@ public:
 
     int PID () const { return pid; }
     int getSocket() const { return sock; }
-    unsigned long getPort() const { return port; }
+    uint16_t getPort() const { return port; }
     List<std::string> &getCountries() { return countries; }
+    std::string getNthCountry(unsigned int pos) {
+        if (pos >= countries.getSize()) return NULL;
+        return *countries.getNode(pos);
+    }
     unsigned int countriesNumber() { return countries.getSize(); }
 
     void setPID(unsigned int p) { pid = p; }
     void setSocket(int s) { sock = s; }
-    void setPort(unsigned long p) { port = p; }
+    void setPort(uint16_t p) { port = p; }
+    void setCountries(const List<std::string> &c) { countries = c; }
     void insertCountry(std::string country) { countries.insertAscending(country); }
 
     friend bool operator==(const MonitorInfo &m1, const MonitorInfo &m2);
