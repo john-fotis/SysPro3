@@ -43,7 +43,7 @@ bool checkTravelArgs(List<std::string> &args) {
         else if (errorNumber == directoryNotFound) std::cerr << "Input directory not found.\n";
         else if (errorNumber == threadIdentifier) std::cerr << "Invalid thread number identifier.\n";
         else if (errorNumber == numOfThreads) std::cerr << "Invalid number of threads.\n";
-        std::cout << "Input should be like: " << INPUT_SERVER;
+        std::cout << "Input should be like: " << INPUT_TRAVEL;
         return false;
     }
 
@@ -71,7 +71,7 @@ bool checkMonitorArgs(List<std::string> &args) {
         if (args.getNode(9)->compare("-s")) errorNumber = mBloomIdentifier;
         if (isInt(*args.getNode(10)))
             if (myStoi(*args.getNode(10)) < 1) errorNumber = mBloomSize;
-        for (int i = 11; i < args.getSize(); i++)
+        for (unsigned int i = 11; i < args.getSize(); i++)
             if ((stat(args.getNode(i)->c_str(), &inputFileName))) errorNumber = pathNotFound;
     }
 
@@ -86,7 +86,7 @@ bool checkMonitorArgs(List<std::string> &args) {
         else if (errorNumber == mBloomIdentifier) std::cerr << "Invalid bloom filter identifier\n";
         else if (errorNumber == mBloomSize) std::cerr << "Invalid bloom filter size\n";
         else if (errorNumber == pathNotFound) std::cerr << "Invalid path given\n";
-        std::cout << "Input should be like: " << INPUT_CLIENT;
+        std::cout << "Input should be like: " << INPUT_MONITOR;
         return false;
     }
 
