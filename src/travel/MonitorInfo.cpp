@@ -4,7 +4,7 @@ MonitorInfo::MonitorInfo(const MonitorInfo &monitor) {
     if (this == &monitor) return;
     pid = monitor.PID();
     sock = monitor.getSocket();
-    port = monitor.getPort();
+    server = monitor.server;
     countries = monitor.countries;
 }
 
@@ -12,38 +12,38 @@ MonitorInfo &MonitorInfo::operator=(const MonitorInfo &monitor) {
     if (this == &monitor) return *this;
     pid = monitor.PID();
     sock = monitor.getSocket();
-    port = monitor.getPort();
+    server = monitor.server;
     countries = monitor.countries;
     return *this;
 }
 
-bool operator==(const MonitorInfo &r1, const MonitorInfo &r2) {
-    return (r1.PID() == r2.PID());
+bool operator==(const MonitorInfo &m1, const MonitorInfo &m2) {
+    return (m1.PID() == m2.PID());
 }
 
-bool operator!=(const MonitorInfo &r1, const MonitorInfo &r2) {
-    return !(r1 == r2);
+bool operator!=(const MonitorInfo &m1, const MonitorInfo &m2) {
+    return !(m1 == m2);
 }
 
-bool operator<(const MonitorInfo &r1, const MonitorInfo &r2) {
-    return r1.PID() < r2.PID();
+bool operator<(const MonitorInfo &m1, const MonitorInfo &m2) {
+    return m1.PID() < m2.PID();
 }
 
-bool operator>(const MonitorInfo &r1, const MonitorInfo &r2) {
-    return r1.PID() > r2.PID();
+bool operator>(const MonitorInfo &m1, const MonitorInfo &m2) {
+    return m1.PID() > m2.PID();
 }
 
-bool operator<=(const MonitorInfo &r1, const MonitorInfo &r2) {
-    return r1.PID() <= r2.PID();
+bool operator<=(const MonitorInfo &m1, const MonitorInfo &m2) {
+    return m1.PID() <= m2.PID();
 }
 
-bool operator>=(const MonitorInfo &r1, const MonitorInfo &r2) {
-    return r1.PID() >= r2.PID();
+bool operator>=(const MonitorInfo &m1, const MonitorInfo &m2) {
+    return m1.PID() >= m2.PID();
 }
 
 std::ostream &operator<<(std::ostream &os, const MonitorInfo &monitor) {
-    os  << monitor.PID() << " " << monitor.getSocket()
-        << " " << monitor.getPort() << std::endl;
+    os  << monitor.PID() << " " << monitor.getSocket() << " "
+        << monitor.getFamily() << " " << monitor.getPort() << std::endl;
     monitor.countries.print();
     return os;
 }
