@@ -1,14 +1,8 @@
 #include <dirent.h>
-#include <errno.h>
-#include <sys/stat.h>
-#include <sys/types.h>
-#include <unistd.h>
-#include <wait.h>
+#include <pthread.h>
 
-#include <cstring>
 #include <fstream>
 #include <iomanip>
-#include <iostream>
 
 #include "../../include/AppStandards.hpp"
 #include "../../include/BloomFilter.hpp"
@@ -18,6 +12,7 @@
 #include "../../include/List.hpp"
 #include "../../include/LogHistory.hpp"
 #include "../../include/Messaging.hpp"
+#include "../../include/Queue.hpp"
 #include "../../include/SignalLibrary.hpp"
 #include "../../include/SkipList.hpp"
 #include "../../include/SocketLibrary.hpp"
@@ -67,6 +62,42 @@ struct appDataBase {
     appDataBase(unsigned int pTableSize = CITIZEN_REGISTRY_SIZE,
         unsigned int entryTableSize = VIRUS_COUNTRY_ENTRIES)
         : citizenRegistry(pTableSize), entriesTable(entryTableSize) {}
+};
+
+// Statistics for files read
+unsigned totalInc = 0, totalDup = 0, totalRecs = 0;
+
+struct circularBuffer {
+    Queue<string> cBufNodes;
+    pthread_mutex_t lock;
+    pthread_mutex_t bufLock;
+    pthread_cond_t condNonEmpty;
+    pthread_cond_t condNonFull;
+    volatile bool end;
+    circularBuffer(unsigned int size)
+    : cBufNodes(size), lock(PTHREAD_MUTEX_INITIALIZER), bufLock(PTHREAD_MUTEX_INITIALIZER),
+    condNonEmpty(PTHREAD_COND_INITIALIZER), condNonFull(PTHREAD_COND_INITIALIZER), end(false) {}
+    ~circularBuffer() {
+        pthread_mutex_destroy(&lock);
+        pthread_mutex_destroy(&bufLock);
+        pthread_cond_destroy(&condNonEmpty);
+        pthread_cond_destroy(&condNonEmpty);
+    }
+};
+
+struct prodInfo {
+    List<string> fileList;
+    circularBuffer *cBufPtr;
+    prodInfo(List<string> files, circularBuffer *cBuf) : fileList(files), cBufPtr(cBuf) {}
+};
+
+struct consInfo {
+    recordInfo *recPtr;
+    recordObject *objPtr;
+    appDataBase *dbPtr;
+    circularBuffer *cBufPtr;
+    consInfo(recordInfo *r, recordObject *o, appDataBase *a, circularBuffer *c)
+    : recPtr(r), objPtr(o), dbPtr(a), cBufPtr(c) {}
 };
 
 // Reads and validates a record line while also splitting it.
@@ -160,7 +191,7 @@ bool insertNewRecord(recordInfo &recInfo, recordObject &obj, appDataBase &db) {
 
     // =========== Duplicates check - End ===========
 
-    // =========== Insert Record Info Start ===========
+    // =========== Insert Record Info - Start ===========
 
     // Since the record passed the duplication check we can now insert it
     if (!recInfo.status.compare("YES")) {
@@ -211,7 +242,7 @@ bool insertNewRecord(recordInfo &recInfo, recordObject &obj, appDataBase &db) {
     // for the vaccination statistics in the corresponding virus-country table
     entryPtr->registerPerson(myStoi(recInfo.ageStr), recInfo.status);
 
-    // ============= Insert Record Info End =============
+    // ============= Insert Record Info - End =============
 
     // If we made it till here, the record was imported successfully...
     return true;
@@ -242,69 +273,54 @@ void initFileList(List<string> folders, List<string> &fileList) {
     }
 }
 
-// Reads all the files in given fileList and imports the records
-// Params: fileList, recordInfo, recordObjects, database,
-// total Inconsistent, total Duplicates, total Records
-void importFileRecords(List<string> fileList, recordInfo &recInfo,
-                       recordObject &obj, appDataBase &db,
-                       unsigned int &inc, unsigned int &dup, unsigned int &total) {
+// Reads the given file and imports its records in the main database
+void importFileRecords(string file, recordInfo &recInfo, recordObject &obj, appDataBase &db) {
     std::ifstream inputFile;
     string line;
     bool recordOk = false, inserted = true;
 
-    for (unsigned int file = 0; file < fileList.getSize(); file++) {
-        // These counters are local for every file
-        unsigned int incRecords = 0, dupRecords = 0, totalLocal = 0;
-        inputFile.open(*fileList.getNode(file));
-        if (!inputFile.is_open()) {
-            std::cerr << OPEN_FAILED << *fileList.getNode(file) << std::endl;
-            exit(-1);
-        }
-
-        while (std::getline(inputFile, line)) {
-            totalLocal++; total++;
-            // Split the current line in variables and do basic validation
-            recordOk = testRecord(line, recInfo, obj, db);
-            if (recordOk) {
-                // Then insert the valid info into the appropriate structures of the app
-                inserted = insertNewRecord(recInfo, obj, db);
-                if (!inserted) {
-                    std::cerr << DUPLICATE_RECORD << line << std::endl;
-                    dupRecords++; dup++;
-                }
-            } else {
-                incRecords++; inc++;
-                std::cerr << INCONSISTENT_RECORD << line << std::endl;
-                // Dump this record
-                continue;
-            }
-        }
-
-        inputFile.close();
-
-        /* Uncomment below to show specific stats for each file */
-        // std::cout << "\nDone reading '" << *fileList.getNode(file) << "'\n"
-        // << "Excluded " << (incRecords + dupRecords)
-        // << "/" << totalLocal << " records.\n"
-        // << "Inconsistent records: " << std::setw(4) << incRecords << std::endl
-        // << "Duplicate records:" << std::setw(8) << dupRecords << std::endl;
+    // These counters are local for the current file
+    unsigned int incRecords = 0, dupRecords = 0, totalLocal = 0;
+    inputFile.open(file);
+    if (!inputFile.is_open()) {
+        std::cerr << OPEN_FAILED << file << std::endl;
+        exit(-1);
     }
 
-    /* Uncomment below to show total stats for all files read */
-    // std::cout << "\n==========================\n" << getpid() << " Completed insertion.\n"
-    // << "Excluded " << (inc + dup)
-    // << "/" << total << " records.\n"
-    // << "Inconsistent records: " << std::setw(4) << inc << std::endl
-    // << "Duplicate records:" << std::setw(8) << dup << std::endl;
+    while (std::getline(inputFile, line)) {
+        totalLocal++; totalRecs++;
+        // Split the current line in variables and do basic validation
+        recordOk = testRecord(line, recInfo, obj, db);
+        if (recordOk) {
+            // Then insert the valid info into the appropriate structures of the app
+            inserted = insertNewRecord(recInfo, obj, db);
+            if (!inserted) {
+                std::cerr << DUPLICATE_RECORD << line << std::endl;
+                dupRecords++; totalDup++;
+            }
+        } else {
+            incRecords++; totalInc++;
+            std::cerr << INCONSISTENT_RECORD << line << std::endl;
+            // Dump this record
+            continue;
+        }
+    }
+
+    inputFile.close();
+
+    /* Uncomment below to show stats for current file */
+    // std::cout << "\nDone reading '" << file << "'\n"
+    // << "Excluded " << (incRecords + dupRecords)
+    // << "/" << totalLocal << " records.\n"
+    // << "Inconsistent records: " << std::setw(4) << incRecords << std::endl
+    // << "Duplicate records:" << std::setw(8) << dupRecords << std::endl;
 }
 
-// Sends all BloomFilters of known viruses to the server
-void sendBloomFilters(appDataBase &db, int fdWrite, unsigned int bloomSize,
-                      unsigned int bufferSize, unsigned int totalInc,
-                      unsigned int totalDup, unsigned int totalRecs) {
+// Sends all BloomFilters of known viruses to the travelClient
+void sendBloomFilters(appDataBase &db, int sockfd, unsigned int bloomSize, unsigned int bufferSize) {
     string line;
     char *buffer;
-    /* Inform the server of the completion with the following formatted message: */
+    /* Inform the client of the completion with the following formatted message: */
     /* [PID] [1/0](Success/Failure) [totalInc] [totalDupl] [totalRecs] [totalViruses] */
     line.assign(toString(getpid()) + " ");
     line.append(toString(1) + " ");
@@ -312,17 +328,68 @@ void sendBloomFilters(appDataBase &db, int fdWrite, unsigned int bloomSize,
     line.append(toString(totalDup) + " ");
     line.append(toString(totalRecs) + " ");
     line.append(toString(db.virusList.getSize()));
-    sendPackets(fdWrite, line.c_str(), line.length()+1, bufferSize);
+    sendPackets(sockfd, line.c_str(), line.length()+1, bufferSize);
 
     // Send all the bloom filters to the server
     for (unsigned int virus = 0; virus < db.virusList.getSize(); virus++) {
         // 1: virusName
         line.assign(db.virusList.getNode(virus)->getName());
-        sendPackets(fdWrite, line.c_str(), line.length()+1, bufferSize);
+        sendPackets(sockfd, line.c_str(), line.length()+1, bufferSize);
         // 2: bloomFilter bitArray
         buffer = db.virusList.getNode(virus)->getBloom();
-        sendPackets(fdWrite, buffer, bloomSize, bufferSize);
+        sendPackets(sockfd, buffer, bloomSize, bufferSize);
     }
+}
+
+// ==================== Threads ====================
+
+// Main thread is the producer and pool contains the consumers for the circular buffer
+
+void place(string file, circularBuffer &cBuffer) {
+    pthread_mutex_lock(&cBuffer.bufLock);
+    while (cBuffer.cBufNodes.full())
+        pthread_cond_wait(&cBuffer.condNonFull, &cBuffer.bufLock);
+    cBuffer.cBufNodes.enqueue(file);
+    // std::cout << "Placed " << file << " in cyclic buffer\n";
+    pthread_mutex_unlock(&cBuffer.bufLock);
+}
+
+string obtain(circularBuffer &cBuffer) {
+    string file;
+    pthread_mutex_lock(&cBuffer.bufLock);
+    while (cBuffer.cBufNodes.empty())
+        pthread_cond_wait(&cBuffer.condNonEmpty, &cBuffer.bufLock);
+    cBuffer.cBufNodes.dequeue(file);
+    // std::cout << "Removed " << file << " from cyclic buffer\n";
+    pthread_mutex_unlock(&cBuffer.bufLock);
+    return file;
+}
+
+// producer function is not void *f(void *) type, because
+// it's supposed to be called only by the main thread
+void producer(void *arg) {
+    prodInfo *info = (prodInfo *)arg;
+    while (!info->fileList.empty()) {
+        place(info->fileList.getFirst(), *info->cBufPtr);
+        info->fileList.popFirst();
+        pthread_cond_signal(&info->cBufPtr->condNonEmpty);
+    }
+    info->cBufPtr->end = true;
+}
+
+void *consumer(void *arg) {
+    consInfo *info = (consInfo *)arg;
+    string file;
+    while(!info->cBufPtr->end || !info->cBufPtr->cBufNodes.empty()) {
+        file = obtain(*info->cBufPtr);
+        pthread_cond_signal(&info->cBufPtr->condNonFull);
+        // Lock the mutex to read the file because we need
+        // the data insertion in the main database to be atomic
+        pthread_mutex_lock(&info->cBufPtr->lock);
+        importFileRecords(file, *info->recPtr, *info->objPtr, *info->dbPtr);
+        pthread_mutex_unlock(&info->cBufPtr->lock);
+    }
+    pthread_exit(0);
 }
 
 int main(int argc, char *argv[]) {
@@ -331,217 +398,242 @@ int main(int argc, char *argv[]) {
     List<string> args;
     for (int i = 0; i < argc; i++)
         args.insertLast(toString(argv[i]));
-    // args: 1) path/to/fifo1 2) path/to/fifo2
     if (!checkMonitorArgs(args)) die("monitor/input", -1);
-
-    args.print();
 
     // ========== Variables ==========
 
-    unsigned int port = myStoi(argv[2]);
+    /* Regular variables */
+    int sock = 0, newsock = 0;
+    uint16_t port = myStoi(argv[2]);
     unsigned int numThreads = myStoi(argv[4]);
     unsigned int bufferSize = myStoi(argv[6]);
     unsigned int cBufferSize = myStoi(argv[8]);
     unsigned int bloomSize = myStoi(argv[10]);
-    unsigned totalInc = 0, totalDup = 0, totalRecs = 0;
+    unsigned int acceptedReqs = 0, rejectedReqs = 0;
     string line;
-    char *buffer;
+    char *buffer = NULL;
+    bool request = false;
     List<string> folders, fileList, newFileList, tempList;
 
-    bool request = false;
-    unsigned int acceptedReqs = 0, rejectedReqs = 0;
+    /* Networking variables */
+    struct sockaddr_in monitor = {'\0'}, travel = {'\0'};
+    socklen_t travelLen = sizeof(travel);
+    struct sockaddr *monitorPtr = (struct sockaddr *)&monitor;
+    struct sockaddr *travelPtr = (struct sockaddr *)&travel;
+    struct hostent *remHost;
 
-    // // argv[1] is the fifo client-X and argv[2] fifo server-X
-    // int fdWrite = fifoOpenWrite(toString(argv[1]));
-    // int fdRead = fifoOpenRead(toString(argv[2]));
+    /* Database structs */
+    // Keeps all necessary info for a record
+    recordInfo recInfo;
+    // Contains all the required objects that are used as buffer to insert
+    // the info of a record into the appropriate data structure
+    // It's initialised with the desired bloomSize
+    recordObject obj(bloomSize);
+    // Contains all the data structrures that implement the app's database for the queries
+    appDataBase db;
+    // Simulates the cyclic buffer
+    circularBuffer cBuffer(cBufferSize);
 
-    // // ========== Signal Handling ==========
+    // ========== Initialize app resources ==========
 
-    // struct sigaction sa = {0};
-    // sa.sa_handler = &signalHandler;
-    // sa.sa_flags = SA_RESTART;
-    // sigemptyset(&sa.sa_mask);
-    // if (sigaction(SIGINT, &sa, NULL) < 0) die("monitor/sigaction, 4");
-    // if (sigaction(SIGQUIT, &sa, NULL) < 0) die("monitor/sigaction, 4");
-    // if (sigaction(SIGUSR1, &sa, NULL) < 0) die("monitor/sigaction, 4");
-    // if (sigaction(SIGUSR2, &sa, NULL) < 0) die("monitor/sigaction, 4");
+    // Store all the folders we need to read
+    for (int i = 11; i < argc; i++) folders.insertLast(toString(argv[i]));
+    initFileList(folders, fileList);
 
-    // // ========== Communication installation START ==========
+    // Prepare thread arguments
+    prodInfo prodArgs(fileList, &cBuffer);
+    consInfo consArgs(&recInfo, &obj, &db, &cBuffer);
 
-    // // 1st message contains the bufferSize
-    // fifoRead(fdRead, &bufferSize, sizeof(int));
-    // // 2nd message contains the bloomSize
-    // fifoRead(fdRead, &bloomSize, sizeof(int));
-    // // 3rd message contains all the subfolders we need to read
-    // buffer = receivePackets(fdRead, bufferSize);
-    // line.assign(buffer);
-    // delete[] buffer;
-    // // Extract all the folders we need to read
-    // splitLine(line, folders);
-    // initFileList(folders, fileList);
+    // Create and start numThread consumers
+    pthread_t pool_t[numThreads];
+    for (unsigned int t = 0; t < numThreads; t++)
+        if (pthread_create(&pool_t[t], NULL, consumer, &consArgs))
+            die("pthread_create", -10);
 
-    // // ========== Create and initialize app resources ==========
-    // // Keeps all necessary info for a record
-    // recordInfo recInfo;
-    // // Contains all the required objects that are used as buffer to insert
-    // // the info of a record into the appropriate data structure
-    // // It's initialised with the desired bloomSize
-    // recordObject obj(bloomSize);
-    // // Contains all the data structrures that implement the app's database for the queries
-    // appDataBase db;
+    // Call the producer function after we create the consumers,
+    // as the main thread will be busy while producing information.
+    producer(&prodArgs);
 
-    // /* Validate & import the input records into the application structure */
-    // importFileRecords(fileList, recInfo, obj, db, totalInc, totalDup, totalRecs);
+    // Wait for all consumers to finish
+    for (unsigned int t = 0; t < numThreads; t++)
+        if (pthread_join(pool_t[t], NULL))
+            die("monitor/pthread_join", -11);
+    // Reset the flag in case there are more files in the future
+    cBuffer.end = false;
 
-    // // Reply to the server
-    // sendBloomFilters(db, fdWrite, bloomSize, bufferSize, totalInc, totalDup, totalRecs);
+    /* Uncomment below to show total stats for all files read */
+    // std::cout << "\n==========================\n" << getpid() << " Completed insertion.\n"
+    // << "Excluded " << (totalInc + totalDup)
+    // << "/" << totalRecs << " records.\n"
+    // << "Inconsistent records: " << std::setw(4) << totalInc << std::endl
+    // << "Duplicate records:" << std::setw(8) << totalDup << std::endl;
 
-    // // ========== Communication installation END ==========
+    std::cout << MONITOR_STARTED(getpid());
 
-    // std::cout << MONITOR_STARTED(getpid());
+    // ========== Communication installation START ==========
 
-    // // Pointers to handle all the structures and objects
-    // Virus *virusPtr;
-    // Person *personPtr;
-    // Record *recordPtr;
+    // Create socket
+    sock = createSocket();
+    monitor.sin_family = AF_INET;
+    monitor.sin_addr.s_addr = htonl(INADDR_ANY);
+    monitor.sin_port = htons(port);
+    // Bind socket to address
+    bindSocket(sock, monitorPtr, sizeof(monitor));
+    // Listen for connections
+    listenConnections(sock, MAX_CONNECTIONS);
+    std::cout << LISTENING_TO(getpid(), port);
 
-    // // Variables for menu options
-    // string command;
-    // int option = -1;
+    newsock = acceptConnection(sock, travelPtr, &travelLen);
+    if ((remHost = gethostbyaddr((const void *)&travel.sin_addr,
+        sizeof(travel.sin_addr), travel.sin_family)) == NULL) {
+        herror("monitor/gethostbyaddr");
+        exit(-4);
+    }
+    std::cout << ACCEPTED_CONN(getpid(), remHost->h_name);
 
-    // // ========== Main application - Queries ==========
+    // Reply to the travelClient
+    sendBloomFilters(db, newsock, bloomSize, bufferSize);
 
-    // do {
+    // ========== Communication installation END ==========
 
-    //     // Wait for a signal
-    //     pause();
-    //     // Detect SIGUSR1
-    //     if (newFilesAdded) {
-    //         // Reset the flag
-    //         newFilesAdded = false;
-    //         option = addRecords;
-    //     }
-    //     // Detect SIGUSR2
-    //     else if (newCommand) {
-    //         // Reset the flag
-    //         newCommand = false;
-    //         buffer = receivePackets(fdRead, bufferSize);
-    //         line.assign(buffer);
-    //         delete[] buffer;
-    //         splitLine(line, args);
-    //         if (isInt(args.getFirst())) {
-    //             option = myStoi(args.getFirst());
-    //             args.popFirst();
-    //         }
-    //     }
-    //     // Detect SIGINT/SIGQUIT
-    //     else if (shutDown) {
-    //         shutDown = false;
-    //         option = exitProgram;
-    //     }
-    //     else continue;
+    // Pointers to handle all the structures and objects
+    Virus *virusPtr;
+    Person *personPtr;
+    Record *recordPtr;
 
-    //     switch (option) {
+    // Variables for menu options
+    string command;
+    int option = -1;
 
-    //         case travelRequest:
+    // ========== Main application - Queries ==========
 
-    //             // Server is requesting in format: [citizenID] [virus]
-    //             recInfo.idStr.assign(args.getFirst());
-    //             obj.record.setID(myStoi(recInfo.idStr));
-    //             recInfo.virusName.assign(args.getLast());
-    //             obj.virus.setName(recInfo.virusName);
-    //             virusPtr = db.virusList.search(obj.virus);
-    //             if (virusPtr) {
-    //                 recordPtr = virusPtr->searchVaccinatedList(obj.record);
-    //                 if (recordPtr) {
-    //                     request = true;
-    //                     obj.date1 = recordPtr->getDate();
-    //                 }
-    //             }
+    do {
 
-    //             // Update local counters
-    //             request ? acceptedReqs++ : rejectedReqs++;
-                
-    //             // Send the result to the back server
-    //             request ? line.assign("YES " + toString(obj.date1)) : line.assign("NO");
-    //             sendPackets(fdWrite, line.c_str(), line.length()+1, bufferSize);
-    //             break;
+        // Read and parse the command
+        buffer = receivePackets(newsock, bufferSize);
+        line.assign(buffer);
+        delete[] buffer;
+        splitLine(line, args);
+        if (isInt(args.getFirst())) {
+            option = myStoi(args.getFirst());
+            args.popFirst();
+        }
 
-    //         case travelStats:
-    //             // Nothing to do here
-    //             break;
+        switch (option) {
 
-    //         case addRecords:
+            case travelRequest:
 
-    //             initFileList(folders, tempList);
-    //             // Keep only the new files
-    //             for (unsigned int file = 0; file < tempList.getSize(); file++)
-    //                 if (!fileList.search(*tempList.getNode(file)))
-    //                     newFileList.insertAscending(*tempList.getNode(file));
+                if (args.getFirst().compare(REQUEST))
+                    // This is an update message from client
+                    request ? acceptedReqs++ : rejectedReqs++;
+                else {
+                    // This is a request from client in format [citizenID] [virus]
+                    recInfo.idStr.assign(args.getFirst());
+                    obj.record.setID(myStoi(recInfo.idStr));
+                    recInfo.virusName.assign(args.getLast());
+                    obj.virus.setName(recInfo.virusName);
+                    virusPtr = db.virusList.search(obj.virus);
+                    if (virusPtr) {
+                        recordPtr = virusPtr->searchVaccinatedList(obj.record);
+                        if (recordPtr) {
+                            request = true;
+                            obj.date1 = recordPtr->getDate();
+                        }
+                    }
+                    // Send the result to the back server
+                    request ? line.assign("YES " + toString(obj.date1)) : line.assign("NO");
+                    sendPackets(newsock, line.c_str(), line.length()+1, bufferSize);
+                }
+                break;
 
-    //             if (newFileList.empty()) {
-    //                 sendPackets(fdWrite, NOT_FOUND, sizeof(NOT_FOUND), bufferSize);
-    //                 break;
-    //             } else sendPackets(fdWrite, UPDATE, sizeof(UPDATE), bufferSize);
+            case travelStats:
+                // Nothing to do here
+                break;
 
-    //             // Update the database
-    //             importFileRecords(newFileList, recInfo, obj, db, totalInc, totalDup, totalRecs);
+            case addRecords:
 
-    //             // Reply to the server
-    //             sendBloomFilters(db, fdWrite, bloomSize, bufferSize, totalInc, totalDup, totalRecs);
+                initFileList(folders, tempList);
+                // Keep only the new files
+                for (unsigned int file = 0; file < tempList.getSize(); file++)
+                    if (!fileList.search(*tempList.getNode(file)))
+                        newFileList.insertAscending(*tempList.getNode(file));
 
-    //             // Update the fileList
-    //             for (unsigned int file = 0; file < newFileList.getSize(); file++)
-    //                 fileList.insertAscending(*newFileList.getNode(file));
-    //             newFileList.flush();
-    //             break;
+                if (newFileList.empty()) {
+                    sendPackets(newsock, NOT_FOUND, sizeof(NOT_FOUND), bufferSize);
+                    break;
+                } else sendPackets(newsock, UPDATE, sizeof(UPDATE), bufferSize);
 
-    //         case searchStatus:
+                // Start threads to update the database
+                for (unsigned int t = 0; t < numThreads; t++)
+                    if (pthread_create(&pool_t[t], NULL, consumer, &consArgs))
+                        die("pthread_create", -10);
 
-    //             obj.person.setID(myStoi(args.getFirst()));
-    //             personPtr = db.citizenRegistry.search(args.getFirst(), obj.person);
-    //             if (!personPtr) {
-    //                 line.assign(NOT_FOUND);
-    //                 sendPackets(fdWrite, line.c_str(), line.length()+1, bufferSize);
-    //                 break;
-    //             }
+                // Call the producer function after we create the consumers,
+                // as the main thread will be busy while producing information.
+                producer(&prodArgs);
 
-    //             // Reply format: [ID] [NAME] [SURNAME] [COUNTRY] [AGE] [VACCINATION-LIST]
-    //             line.assign(args.getFirst() + " " +
-    //                         personPtr->getFirstName() + " " +
-    //                         personPtr->getLastName() + " " +
-    //                         personPtr->getCountry().getName() + " " +
-    //                         toString(personPtr->getAge()));
+                // Wait for all consumers to finish
+                for (unsigned int t = 0; t < numThreads; t++)
+                    if (pthread_join(pool_t[t], NULL))
+                        die("monitor/pthread_join", -11);
+                // Reset the flag in case there are more files in the future
+                cBuffer.end = false;
 
-    //             obj.record.setID(personPtr->ID());
+                // Reply to the server
+                sendBloomFilters(db, newsock, bloomSize, bufferSize);
 
-    //             for (unsigned int virus = 0; virus < db.virusList.getSize(); virus++) {
-    //                 virusPtr = db.virusList.getNode(virus);
-    //                 line.append(" " + virusPtr->getName() + " ");
-    //                 recordPtr = NULL;
-    //                 if (virusPtr->checkBloom(args.getFirst()))
-    //                     recordPtr = virusPtr->searchVaccinatedList(obj.record);
-    //                 recordPtr ? line.append(recordPtr->getDate()) : line.append("NO");
-    //             }
+                // Update the fileList
+                for (unsigned int file = 0; file < newFileList.getSize(); file++)
+                    fileList.insertAscending(*newFileList.getNode(file));
+                newFileList.flush();
+                break;
 
-    //             sendPackets(fdWrite, line.c_str(), line.length()+1, bufferSize);
-    //             break;
+            case searchStatus:
 
-    //         default:
-    //             break;
-    //     }
-    // } while (option);
+                obj.person.setID(myStoi(args.getFirst()));
+                personPtr = db.citizenRegistry.search(args.getFirst(), obj.person);
+                if (!personPtr) {
+                    line.assign(NOT_FOUND);
+                    sendPackets(newsock, line.c_str(), line.length()+1, bufferSize);
+                    break;
+                }
 
-    // for (unsigned int i = 0; i < db.countryList.getSize(); i++)
-    //     tempList.insertAscending(db.countryList.getNode(i)->getName());
+                // Reply format: [ID] [NAME] [SURNAME] [COUNTRY] [AGE] [VACCINATION-LIST]
+                line.assign(args.getFirst() + " " +
+                            personPtr->getFirstName() + " " +
+                            personPtr->getLastName() + " " +
+                            personPtr->getCountry().getName() + " " +
+                            toString(personPtr->getAge()));
 
-    // // Save the request statistics in log files
-    // writeLogFile(tempList, toString(LOG_FILES), PERMS, acceptedReqs, rejectedReqs);
+                obj.record.setID(personPtr->ID());
 
-    // std::cout << MONITOR_STOPPED(getpid());
+                for (unsigned int virus = 0; virus < db.virusList.getSize(); virus++) {
+                    virusPtr = db.virusList.getNode(virus);
+                    line.append(" " + virusPtr->getName() + " ");
+                    recordPtr = NULL;
+                    if (virusPtr->checkBloom(args.getFirst()))
+                        recordPtr = virusPtr->searchVaccinatedList(obj.record);
+                    recordPtr ? line.append(recordPtr->getDate()) : line.append("NO");
+                }
 
-    // fifoClose(fdRead);
-    // fifoClose(fdWrite);
+                sendPackets(newsock, line.c_str(), line.length()+1, bufferSize);
+                break;
+
+            default:
+                break;
+        }
+    } while (option);
+
+    for (unsigned int i = 0; i < db.countryList.getSize(); i++)
+        tempList.insertAscending(db.countryList.getNode(i)->getName());
+
+    // Save the request statistics in log files
+    writeLogFile(tempList, toString(LOGS_PATH), PERMS, acceptedReqs, rejectedReqs);
+
+    std::cout << MONITOR_STOPPED(getpid());
+
+    closeSocket(sock);
 
     return 0;
+
 }
