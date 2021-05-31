@@ -13,10 +13,10 @@ SCRIPTS	= create_infiles.sh
 # Run Parameters
 BUFFSZ	= 64
 CBUFFSZ	= 10
-NUMBER	= 4
+NUMBER	= 9
 BLOOMSZ	= 1000
 INDIR	= input_dir/
-THREADS	= 2
+THREADS	= 4
 INFILE	= citizenRecordsFile
 BINDIR	= bin/
 LOGDIR	= logs/
@@ -58,8 +58,8 @@ valgrind:
 help:
 	@echo Options:
 	@printf "make (all) %14s -- build $(TARGET) and $(TARGET2)\n"
-	@printf "make $(TARGET) %6s -- build $(TARGET)\n"
-	@printf "make $(TARGET2) %12s -- build $(TARGET2)\n"
+	@printf "make $(TARGET) %0s -- build $(TARGET)\n"
+	@printf "make $(TARGET2) %6s -- build $(TARGET2)\n"
 	@printf "make clean %14s -- delete application\n"
 	@printf "make cleanFull %10s -- delete application and its data\n"
 	@printf "make count %14s -- project line and words accounting\n"
