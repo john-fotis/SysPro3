@@ -31,6 +31,8 @@
 *.out
 *.app
 
-input_dir
+.vscode
+input_dir/
+tests/
 travelMonitorClient
 monitorServer
