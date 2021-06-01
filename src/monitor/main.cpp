@@ -69,16 +69,16 @@ unsigned totalInc = 0, totalDup = 0, totalRecs = 0;
 
 struct circularBuffer {
     Queue<string> cBufNodes;
-    pthread_mutex_t lock;
+    pthread_mutex_t dbLock;
     pthread_mutex_t bufLock;
     pthread_cond_t condNonEmpty;
     pthread_cond_t condNonFull;
     volatile bool end;
     circularBuffer(unsigned int size)
-    : cBufNodes(size), lock(PTHREAD_MUTEX_INITIALIZER), bufLock(PTHREAD_MUTEX_INITIALIZER),
+    : cBufNodes(size), dbLock(PTHREAD_MUTEX_INITIALIZER), bufLock(PTHREAD_MUTEX_INITIALIZER),
     condNonEmpty(PTHREAD_COND_INITIALIZER), condNonFull(PTHREAD_COND_INITIALIZER), end(false) {}
     ~circularBuffer() {
-        pthread_mutex_destroy(&lock);
+        pthread_mutex_destroy(&dbLock);
         pthread_mutex_destroy(&bufLock);
         pthread_cond_destroy(&condNonEmpty);
         pthread_cond_destroy(&condNonEmpty);
@@ -385,15 +385,15 @@ void *consumer(void *arg) {
         pthread_cond_signal(&info->cBufPtr->condNonFull);
         // Lock the mutex to read the file because we need
         // the data insertion in the main database to be atomic
-        pthread_mutex_lock(&info->cBufPtr->lock);
+        pthread_mutex_lock(&info->cBufPtr->dbLock);
         importFileRecords(file, *info->recPtr, *info->objPtr, *info->dbPtr);
-        pthread_mutex_unlock(&info->cBufPtr->lock);
+        pthread_mutex_unlock(&info->cBufPtr->dbLock);
     }
     pthread_exit(EXIT_SUCCESS);
 }
 
 int main(int argc, char *argv[]) {
-
+    sleep(5);
     // =========== Input Arguments Validation ===========
     List<string> args;
     for (int i = 0; i < argc; i++)
@@ -523,11 +523,12 @@ int main(int argc, char *argv[]) {
 
             case travelRequest:
 
-                if (args.getFirst().compare(REQUEST))
-                    // This is an update message from client
+                if (args.getFirst().compare(REQUEST)) {
+                    // This is an update message from client, either ["ACCEPTED"] or ["REJECTED"]
                     !args.getFirst().compare(ACCEPTED) ? acceptedReqs++ : rejectedReqs++;
-                else {
-                    // This is a request from client in format [citizenID] [virus]
+                } else {
+                    // This is a request from client in format ["REQUEST"] [citizenID] [virus]
+                    args.popFirst();
                     recInfo.idStr.assign(args.getFirst());
                     obj.record.setID(myStoi(recInfo.idStr));
                     recInfo.virusName.assign(args.getLast());
@@ -563,6 +564,7 @@ int main(int argc, char *argv[]) {
                     break;
                 } else sendPackets(newsock, UPDATE, sizeof(UPDATE), bufferSize);
 
+                prodArgs.fileList = newFileList;
                 // Start threads to update the database
                 for (unsigned int t = 0; t < numThreads; t++)
                     if (pthread_create(&pool_t[t], NULL, consumer, &consArgs))

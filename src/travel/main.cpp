@@ -97,7 +97,7 @@ int main(int argc, char *argv[]) {
     if (inputDir.back() != '/') inputDir.append("/");
     unsigned int numThreads = myStoi(argv[12]);
 
-    // Regular variables
+    /* Regular variables */
     pid_t pid = 0;
     int status = 0, exitStatus = 0;
     string line, country;
@@ -106,7 +106,7 @@ int main(int argc, char *argv[]) {
     unsigned int acceptedReqs = 0, rejectedReqs = 0;
     unsigned int localAccRecs = 0, localRejRecs = 0;
 
-    /* Main app objects */
+    /* Objects */
     MonitorInfo monitor;
     VirusRegistry virus(bloomSize);
     Request request;
@@ -132,11 +132,10 @@ int main(int argc, char *argv[]) {
     // distinguished by the destination country
     List<RequestRegistry> registryList;
 
-    // Networking variables
-    struct sockaddr_in server;
-    struct sockaddr *serverPtr = (struct sockaddr *)&server;
-    hostent *remHost;
-    struct in_addr **addr_list;
+    /* Networking variables */
+    struct sockaddr *serverPtr = NULL;
+    hostent *remHost = NULL;
+    struct in_addr **addr_list = NULL;
 
     // =========== Variables End ===========
 
@@ -250,7 +249,7 @@ int main(int argc, char *argv[]) {
         } while (errno && !alarmTimeOut);
         
         if (alarmTimeOut) {
-            std::cerr << "\nError: Connection timed-out. Aborting...\n";
+            std::cerr << CONNECTION_TIMED_OUT;
             // Terminate all monitors
             for (unsigned int mon = 0; mon < numMonitors; mon++)
                 kill(monitorList.getNode(mon)->PID(), SIGKILL);
@@ -258,6 +257,8 @@ int main(int argc, char *argv[]) {
                 waitpid(monitorList.getNode(mon)->PID(), NULL, 0);
             exit(EXIT_FAILURE);
         }
+        // Cancel pending alarms after successfull connection
+        alarm(0);
     }
 
     for (unsigned int mon = 0; mon < numMonitors; mon++)
@@ -522,7 +523,7 @@ int main(int argc, char *argv[]) {
     for (unsigned int mon = 0; mon < monitorList.getSize(); mon++)
         sendPackets(monitorList.getNode(mon)->getSocket(), line.c_str(), line.length()+1, bufferSize);
 
-    // Wait for all Monitors to finish and deallocate their resources
+    // Wait for all Monitors to finish
     for (unsigned int mon = 0; mon < monitorList.getSize(); mon++)
         waitpid(monitorList.getNode(mon)->PID(), NULL, 0);
 
@@ -537,6 +538,6 @@ int main(int argc, char *argv[]) {
     if ((exitStatus = WEXITSTATUS(status)))
         std::cout << EXIT_CODE_FROM(getpid(), exitStatus) << std::endl;
         
-    return 0;
+    return EXIT_SUCCESS;
 
 }
