@@ -389,7 +389,7 @@ void *consumer(void *arg) {
         importFileRecords(file, *info->recPtr, *info->objPtr, *info->dbPtr);
         pthread_mutex_unlock(&info->cBufPtr->lock);
     }
-    pthread_exit(0);
+    pthread_exit(EXIT_SUCCESS);
 }
 
 int main(int argc, char *argv[]) {
@@ -525,7 +525,7 @@ int main(int argc, char *argv[]) {
 
                 if (args.getFirst().compare(REQUEST))
                     // This is an update message from client
-                    request ? acceptedReqs++ : rejectedReqs++;
+                    !args.getFirst().compare(ACCEPTED) ? acceptedReqs++ : rejectedReqs++;
                 else {
                     // This is a request from client in format [citizenID] [virus]
                     recInfo.idStr.assign(args.getFirst());
@@ -633,7 +633,8 @@ int main(int argc, char *argv[]) {
     std::cout << MONITOR_STOPPED(getpid());
 
     closeSocket(sock);
+    closeSocket(newsock);
 
-    return 0;
+    return EXIT_SUCCESS;
 
 }
