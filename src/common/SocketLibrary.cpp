@@ -33,14 +33,14 @@ void closeSocket(int sock) {
 
 void writeToSocket(int sockfd, void *message, size_t bufferSize) {
     if (send(sockfd, message, bufferSize, 0) < 0) {
-        perror("socket/write");
+        perror("socket/send");
         exit(16);
     }
 }
 
 void readFromSocket(int sockfd, void *message, size_t bufferSize) {
     if (recv(sockfd, message, bufferSize, 0) < 0) {
-        perror("socket/read");
+        perror("socket/recv");
         exit(17);
     }
 }
