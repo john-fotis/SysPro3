@@ -33,6 +33,7 @@ typedef std::string string;
 #define ALTERNATIVE_NAME(NAME) "Alternative Name: " << NAME << "\n"
 #define RESOLVED_HOST(NAME, IP) NAME << " resolved to " << IP << "\n\n"
 #define ATTEMPTING_CONN(NAME, PORT) "Attempting connection to " << NAME << " at port " << PORT << "\n"
+#define CONNECTION_TIMED_OUT "\nError: Connection timed-out. Aborting...\n"
 #define MONITOR_REPLACE(OLD, NEW) "Replacing Monitor " << OLD << " with " << NEW << "...\n"
 #define MONITOR_ERROR(PID) "\nAn error occurred with monitor #" << PID
 #define SPOILER "\nType /help to display the available options or /exit to exit the application.\n\n"
