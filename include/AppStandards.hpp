@@ -15,7 +15,7 @@ typedef std::string string;
 
 // travelClient parameters
 #define PERMS 0775
-#define TIME_OUT 5 // seconds
+#define TIME_OUT 10 // seconds
 #define LOGS_PATH "logs/"
 
 // monitorServer parameters
