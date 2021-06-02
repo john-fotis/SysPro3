@@ -393,7 +393,7 @@ void *consumer(void *arg) {
 }
 
 int main(int argc, char *argv[]) {
-    sleep(5);
+
     // =========== Input Arguments Validation ===========
     List<string> args;
     for (int i = 0; i < argc; i++)
