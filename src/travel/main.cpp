@@ -83,7 +83,7 @@ int main(int argc, char *argv[]) {
     List<string> args;
     for (int i = 0; i < argc; i++) args.insertLast(argv[i]);
     if (!checkTravelArgs(args)) {
-        perror("server/input");
+        perror("travel/input");
         exit(-1);
     }
 
@@ -128,7 +128,7 @@ int main(int argc, char *argv[]) {
     List<string> countryList;
     // A list of known viruses based on requests
     List<VirusRegistry> virusList;
-    // This entity stores all requests made to the server
+    // This entity stores all requests made to the travelClient
     // distinguished by the destination country
     List<RequestRegistry> registryList;
 

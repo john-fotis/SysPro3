@@ -321,7 +321,7 @@ void sendBloomFilters(appDataBase &db, int sockfd, unsigned int bloomSize, unsig
     string line;
     char *buffer;
     /* Inform the client of the completion with the following formatted message: */
-    /* [PID] [1/0](Success/Failure) [totalInc] [totalDupl] [totalRecs] [totalViruses] */
+    /* [PID] [1/0](Success/Failure) [totalInc] [totalDup] [totalRecs] [totalViruses] */
     line.assign(toString(getpid()) + " ");
     line.append(toString(1) + " ");
     line.append(toString(totalInc) + " ");
@@ -541,7 +541,7 @@ int main(int argc, char *argv[]) {
                             obj.date1 = recordPtr->getDate();
                         }
                     }
-                    // Send the result to the back server
+                    // Send the result to the back travelClient
                     request ? line.assign("YES " + toString(obj.date1)) : line.assign("NO");
                     sendPackets(newsock, line.c_str(), line.length()+1, bufferSize);
                 }
@@ -581,7 +581,7 @@ int main(int argc, char *argv[]) {
                 // Reset the flag in case there are more files in the future
                 cBuffer.end = false;
 
-                // Reply to the server
+                // Reply to the travelClient
                 sendBloomFilters(db, newsock, bloomSize, bufferSize);
 
                 // Update the fileList
