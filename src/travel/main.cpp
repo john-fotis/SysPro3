@@ -96,6 +96,9 @@ int main(int argc, char *argv[]) {
     string inputDir(argv[10]);
     if (inputDir.back() != '/') inputDir.append("/");
     unsigned int numThreads = myStoi(argv[12]);
+    extern unsigned int TIME_OUT;
+    // Check if user gave explicit TIME_OUT value
+    if (argc == 15) TIME_OUT = myStoi(argv[14]);
 
     /* Regular variables */
     pid_t pid = 0;
