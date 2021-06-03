@@ -342,9 +342,10 @@ void sendBloomFilters(appDataBase &db, int sockfd, unsigned int bloomSize, unsig
 }
 
 // ==================== Threads ====================
+// Main thread is the producer and pool contains
+// the consumers for the circular buffer
 
-// Main thread is the producer and pool contains the consumers for the circular buffer
-
+// Places a filaName in the cyclic buffer to be consumed
 void place(string file, circularBuffer &cBuffer) {
     pthread_mutex_lock(&cBuffer.bufLock);
     while (cBuffer.cBufNodes.full())
@@ -354,6 +355,7 @@ void place(string file, circularBuffer &cBuffer) {
     pthread_mutex_unlock(&cBuffer.bufLock);
 }
 
+// Obtains the first available fileName in the cyclic buffer to be consumed
 string obtain(circularBuffer &cBuffer) {
     string file;
     pthread_mutex_lock(&cBuffer.bufLock);
@@ -369,6 +371,7 @@ string obtain(circularBuffer &cBuffer) {
 // it's supposed to be called only by the main thread
 void producer(void *arg) {
     prodInfo *info = (prodInfo *)arg;
+    info->cBufPtr->end = false;
     while (!info->fileList.empty()) {
         place(info->fileList.getFirst(), *info->cBufPtr);
         info->fileList.popFirst();
@@ -377,6 +380,7 @@ void producer(void *arg) {
     info->cBufPtr->end = true;
 }
 
+// Consumes a file by inserting all its data into the database
 void *consumer(void *arg) {
     consInfo *info = (consInfo *)arg;
     string file;
@@ -458,8 +462,6 @@ int main(int argc, char *argv[]) {
     for (unsigned int t = 0; t < numThreads; t++)
         if (pthread_join(pool_t[t], NULL))
             die("monitor/pthread_join", -11);
-    // Reset the flag in case there are more files in the future
-    cBuffer.end = false;
 
     /* Uncomment below to show total stats for all files read */
     // std::cout << "\n==========================\n" << getpid() << " Completed insertion.\n"
@@ -578,8 +580,6 @@ int main(int argc, char *argv[]) {
                 for (unsigned int t = 0; t < numThreads; t++)
                     if (pthread_join(pool_t[t], NULL))
                         die("monitor/pthread_join", -11);
-                // Reset the flag in case there are more files in the future
-                cBuffer.end = false;
 
                 // Reply to the travelClient
                 sendBloomFilters(db, newsock, bloomSize, bufferSize);
@@ -626,6 +626,7 @@ int main(int argc, char *argv[]) {
         }
     } while (option);
 
+    tempList.flush();
     for (unsigned int i = 0; i < db.countryList.getSize(); i++)
         tempList.insertAscending(db.countryList.getNode(i)->getName());
 
