@@ -17,6 +17,7 @@ NUMBER	= 9
 BLOOMSZ	= 1000
 INDIR	= input_dir/
 THREADS	= 4
+TIMEOUT	= 120
 INFILE	= citizenRecordsFile
 BINDIR	= bin/
 LOGDIR	= logs/
@@ -46,14 +47,11 @@ count:
 run:
 	./$(TARGET) -m $(NUMBER) -b $(BUFFSZ) -c $(CBUFFSZ) -s $(BLOOMSZ) -i $(INDIR) -t $(THREADS)
 
-run2:
-	./$(TARGET2) -p 100 -t 3 -b 64 -c 10 -s 1000 ./input_dir/AUSTRALIA/
-
 scriptRun:
 	./$(SCRIPTS) $(INFILE) $(INDIR) $(NUMBER)
 
 valgrind:
-	valgrind -s --leak-check=full --show-leak-kinds=all --show-reachable=yes --trace-children=yes --track-origins=yes ./$(TARGET) -m $(NUMBER) -b $(BUFFSZ) -c $(CBUFFSZ) -s $(BLOOMSZ) -i $(INDIR) -t $(THREADS)
+	valgrind -s --leak-check=full --show-leak-kinds=all --show-reachable=yes --trace-children=yes --track-origins=yes ./$(TARGET) -m $(NUMBER) -b $(BUFFSZ) -c $(CBUFFSZ) -s $(BLOOMSZ) -i $(INDIR) -t $(THREADS) -o $(TIMEOUT)
 
 help:
 	@echo Options:
