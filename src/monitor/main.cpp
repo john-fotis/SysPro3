@@ -510,6 +510,7 @@ int main(int argc, char *argv[]) {
 
     do {
 
+        option = -1;
         // Read and parse the command
         buffer = receivePackets(newsock, bufferSize);
         line.assign(buffer);
