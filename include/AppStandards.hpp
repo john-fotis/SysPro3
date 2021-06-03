@@ -132,6 +132,7 @@ bool checkMonitorArgs(List<std::string> &args);
 // Returns -1 on invalid option or number of selected option in enumeration
 int getOptions(std::string input);
 void printOptions();
+// Exit program after printing err
 void die(const char *err, int code);
 
 #endif
