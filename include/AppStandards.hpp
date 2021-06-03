@@ -15,7 +15,6 @@ typedef std::string string;
 
 // travelClient parameters
 #define PERMS 0775
-#define TIME_OUT 10 // seconds
 #define LOGS_PATH "logs/"
 
 // monitorServer parameters
@@ -23,7 +22,7 @@ typedef std::string string;
 #define VIRUS_COUNTRY_ENTRIES 100
 
 // System messages - travelClient
-#define INPUT_TRAVEL "\n./travelMonitorClient –m numMonitors -b socketBufferSize -c cyclicBufferSize -s sizeOfBloom -i input_dir -t numThreads\n"
+#define INPUT_TRAVEL "\n./travelMonitorClient –m numMonitors -b socketBufferSize -c cyclicBufferSize -s sizeOfBloom -i input_dir -t numThreads (-o timeOutSeconds)\n"
 #define SERVER_STARTING "\nStarting the server...\n"
 #define SERVER_STARTED "\nThe server is up.\n"
 #define SERVER_STOPPING "\nStopping the server...\n"
@@ -97,7 +96,9 @@ enum travelErrors {
     directoryIdentifier = 10,
     directoryNotFound = 11,
     threadIdentifier = 12,
-    numOfThreads = 13
+    numOfThreads = 13,
+    timeoutIdentifier = 14,
+    timeoutValue = 15
 };
 
 // monitorServer error codes

@@ -4,29 +4,43 @@
 #include "../../include/AppStandards.hpp"
 #include "../../include/DataManipulationLib.hpp"
 
+// Connection time-out seconds
+unsigned int TIME_OUT = 10;
+
 bool checkTravelArgs(List<std::string> &args) {
     unsigned int errorNumber = 0;
     struct stat inputDirName;
 
-    if (args.getSize() != 13) errorNumber = travelArgsNum;
+    if (args.getSize() < 13 || args.getSize() > 15) errorNumber = travelArgsNum;
     else {
         if (args.getNode(1)->compare("-m")) errorNumber = monitorIdentifier;
-        if (isInt(*args.getNode(2)))
+        if (isInt(*args.getNode(2))) {
             if (myStoi(*args.getNode(2)) < 1) errorNumber = monitorNumber;
+        } else errorNumber = monitorNumber;
         if (args.getNode(3)->compare("-b")) errorNumber = bufferIdentifier;
-        if (isInt(*args.getNode(4)))
+        if (isInt(*args.getNode(4))) {
             if (myStoi(*args.getNode(4)) < 1) errorNumber = bufferSize;
+        } else errorNumber = bufferSize;
         if (args.getNode(5)->compare("-c")) errorNumber = cBuffIdentifier;
-        if (isInt(*args.getNode(6)))
+        if (isInt(*args.getNode(6))) {
             if (myStoi(*args.getNode(6)) < 1) errorNumber = cBuffSize;
+        } else errorNumber = cBuffSize;
         if (args.getNode(7)->compare("-s")) errorNumber = bloomIdentifier;
-        if (isInt(*args.getNode(8)))
+        if (isInt(*args.getNode(8))) {   
             if (myStoi(*args.getNode(8)) < 1) errorNumber = bloomSize;
+        } else errorNumber = bloomSize;
         if (args.getNode(9)->compare("-i")) errorNumber = directoryIdentifier;
         if ((stat(args.getNode(10)->c_str(), &inputDirName))) errorNumber = directoryNotFound;
         if (args.getNode(11)->compare("-t")) errorNumber = threadIdentifier;
-        if (isInt(*args.getNode(12)))
+        if (isInt(*args.getNode(12))) {
             if (myStoi(*args.getNode(12)) < 1) errorNumber = numOfThreads;
+        } else errorNumber = numOfThreads;
+        if (args.getSize() == 15) {
+            if (args.getNode(13)->compare("-o")) errorNumber = timeoutIdentifier;
+            if (isInt((*args.getNode(14)))) {
+                if (myStoi(*args.getNode(14)) < 1) errorNumber = timeoutValue;
+            } else errorNumber = timeoutValue;
+        }
     }
 
     if (errorNumber) {
@@ -43,6 +57,8 @@ bool checkTravelArgs(List<std::string> &args) {
         else if (errorNumber == directoryNotFound) std::cerr << "Input directory not found.\n";
         else if (errorNumber == threadIdentifier) std::cerr << "Invalid thread number identifier.\n";
         else if (errorNumber == numOfThreads) std::cerr << "Invalid number of threads.\n";
+        else if (errorNumber == timeoutIdentifier) std::cerr << "Invalid time-out identifier.\n";
+        else if (errorNumber == timeoutValue) std::cerr << "Invalid time-out value.\n";
         std::cout << "Input should be like: " << INPUT_TRAVEL;
         return false;
     }
