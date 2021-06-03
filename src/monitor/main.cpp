@@ -13,7 +13,6 @@
 #include "../../include/LogHistory.hpp"
 #include "../../include/Messaging.hpp"
 #include "../../include/Queue.hpp"
-#include "../../include/SignalLibrary.hpp"
 #include "../../include/SkipList.hpp"
 #include "../../include/SocketLibrary.hpp"
 #include "include/Country.hpp"

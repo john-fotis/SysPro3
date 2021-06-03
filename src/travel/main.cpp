@@ -12,7 +12,6 @@
 #include "../../include/List.hpp"
 #include "../../include/LogHistory.hpp"
 #include "../../include/Messaging.hpp"
-#include "../../include/SignalLibrary.hpp"
 #include "../../include/SocketLibrary.hpp"
 #include "include/MonitorInfo.hpp"
 #include "include/Request.hpp"
@@ -96,9 +95,6 @@ int main(int argc, char *argv[]) {
     string inputDir(argv[10]);
     if (inputDir.back() != '/') inputDir.append("/");
     unsigned int numThreads = myStoi(argv[12]);
-    extern unsigned int TIME_OUT;
-    // Check if user gave explicit TIME_OUT value
-    if (argc == 15) TIME_OUT = myStoi(argv[14]);
 
     /* Regular variables */
     pid_t pid = 0;
@@ -240,7 +236,7 @@ int main(int argc, char *argv[]) {
         std::cout << ATTEMPTING_CONN(remHost->h_name, monitorPtr->getPort());
 
         // The alarm protects from connection timing-out
-        alarm(TIME_OUT);
+        alarm(120);
         do {
             errno = 0;
             if (connect(monitorPtr->getSocket(), serverPtr, monitorPtr->getSockLen()) < 0)
