@@ -370,13 +370,19 @@ string obtain(circularBuffer &cBuffer) {
 // it's supposed to be called only by the main thread
 void producer(void *arg) {
     prodInfo *info = (prodInfo *)arg;
+    pthread_mutex_lock(&info->cBufPtr->bufLock);
     info->cBufPtr->end = false;
+    pthread_mutex_unlock(&info->cBufPtr->bufLock);
     while (!info->fileList.empty()) {
         place(info->fileList.getFirst(), *info->cBufPtr);
         info->fileList.popFirst();
+        // We are sure that any thread to be woke, will be able
+        // to consume the file so we don't need to broadcast
         pthread_cond_signal(&info->cBufPtr->condNonEmpty);
     }
+    pthread_mutex_lock(&info->cBufPtr->bufLock);
     info->cBufPtr->end = true;
+    pthread_mutex_unlock(&info->cBufPtr->bufLock);
 }
 
 // Consumes a file by inserting all its data into the database
