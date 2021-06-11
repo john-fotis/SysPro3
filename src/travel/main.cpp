@@ -81,10 +81,7 @@ int main(int argc, char *argv[]) {
     // =========== Input Arguments Validation ===========
     List<string> args;
     for (int i = 0; i < argc; i++) args.insertLast(argv[i]);
-    if (!checkTravelArgs(args)) {
-        perror("travel/input");
-        exit(-1);
-    }
+    if (!checkTravelArgs(args)) die("travel/input", -1);
 
     // =========== Variables Start ===========
 
@@ -95,6 +92,8 @@ int main(int argc, char *argv[]) {
     string inputDir(argv[10]);
     if (inputDir.back() != '/') inputDir.append("/");
     unsigned int numThreads = myStoi(argv[12]);
+    extern unsigned int TIME_OUT;
+    if (argc == 15) TIME_OUT = myStoi(argv[14]);
 
     /* Regular variables */
     pid_t pid = 0;
@@ -236,7 +235,7 @@ int main(int argc, char *argv[]) {
         std::cout << ATTEMPTING_CONN(remHost->h_name, monitorPtr->getPort());
 
         // The alarm protects from connection timing-out
-        alarm(120);
+        alarm(TIME_OUT);
         do {
             errno = 0;
             if (connect(monitorPtr->getSocket(), serverPtr, monitorPtr->getSockLen()) < 0)
