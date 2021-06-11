@@ -405,8 +405,7 @@ int main(int argc, char *argv[]) {
 
     // =========== Input Arguments Validation ===========
     List<string> args;
-    for (int i = 0; i < argc; i++)
-        args.insertLast(toString(argv[i]));
+    for (int i = 0; i < argc; i++) args.insertLast(toString(argv[i]));
     if (!checkMonitorArgs(args)) die("monitor/input", -1);
 
     // ========== Variables ==========
