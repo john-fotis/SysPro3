@@ -22,7 +22,7 @@ typedef std::string string;
 #define VIRUS_COUNTRY_ENTRIES 100
 
 // System messages - travelClient
-#define INPUT_TRAVEL "\n./travelMonitorClient –m numMonitors -b socketBufferSize -c cyclicBufferSize -s sizeOfBloom -i input_dir -t numThreads (-o timeOutSeconds)\n"
+#define INPUT_TRAVEL "\n./travelMonitorClient -m numMonitors -b socketBufferSize -c cyclicBufferSize -s sizeOfBloom -i input_dir -t numThreads (-o timeOutSeconds)\n"
 #define SERVER_STARTING "\nStarting the server...\n"
 #define SERVER_STARTED "\nThe server is up.\n"
 #define SERVER_STOPPING "\nStopping the server...\n"
