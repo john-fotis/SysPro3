@@ -51,7 +51,7 @@ scriptRun:
 	./$(SCRIPTS) $(INFILE) $(INDIR) $(NUMBER)
 
 valgrind:
-	valgrind -s --leak-check=full --show-leak-kinds=all --show-reachable=yes --trace-children=yes --track-origins=yes ./$(TARGET) -m $(NUMBER) -b $(BUFFSZ) -c $(CBUFFSZ) -s $(BLOOMSZ) -i $(INDIR) -t $(THREADS) -o $(TIMEOUT)
+	valgrind --leak-check=full --show-leak-kinds=all --show-reachable=yes --trace-children=yes --track-origins=yes ./$(TARGET) -m $(NUMBER) -b $(BUFFSZ) -c $(CBUFFSZ) -s $(BLOOMSZ) -i $(INDIR) -t $(THREADS) -o $(TIMEOUT)
 
 help:
 	@echo Options:
