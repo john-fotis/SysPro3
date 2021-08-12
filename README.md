@@ -40,4 +40,4 @@ You can run everything, in the root path of the project, using the [Makefile](ht
  
 ## Copyright and License: <br/>
 &copy; 2021 John Fotis <br/>
-This project is licensed under the [MIT License](https://github.com/john-fotis/SysPro2/blob/main/LICENSE.md)
+This project is licensed under the [MIT License](https://github.com/john-fotis/SysPro3/blob/main/LICENSE.md)
